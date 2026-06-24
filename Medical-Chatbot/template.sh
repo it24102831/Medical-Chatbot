@@ -1,6 +1,7 @@
 #Creating directory
 mkdir -p src
-echo -p research
+mkdir -p research
+
 
 #Creating files
 touch src/_init_.py
