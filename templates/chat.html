@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical AI Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="app-shell">
+        <section class="chat-card">
+            <header class="chat-header">
+                <div class="brand">
+                    <div class="brand-avatar" aria-hidden="true">🤖</div>
+                    <div>
+                        <h1>Medical AI Assistant</h1>
+                        <p><span class="status-dot"></span>Online</p>
+                    </div>
+                </div>
+
+                <div class="trust-pill" aria-label="Secure and private">
+                    <div class="trust-icon" aria-hidden="true">🛡️</div>
+                    <div>
+                        <strong>Secure &amp; Private</strong>
+                        <span>Your conversations are safe</span>
+                    </div>
+                </div>
+            </header>
+
+            <section class="chat-body" id="chat-body" aria-label="Chat messages">
+                <article class="message-row message-row--bot">
+                    <div class="avatar avatar--bot" aria-hidden="true">🤖</div>
+                    <div class="bubble bubble--bot">
+                        <p>Hello! I’m your Medical AI Assistant.</p>
+                        <p>How can I help you today?</p>
+                        <time>10:30 AM</time>
+                    </div>
+                </article>
+
+                <article class="message-row message-row--user">
+                    <div class="bubble bubble--user">
+                        <p>What are the symptoms of diabetes?</p>
+                        <time>10:30 AM ✓✓</time>
+                    </div>
+                </article>
+
+                <article class="message-row message-row--bot">
+                    <div class="avatar avatar--bot" aria-hidden="true">🤖</div>
+                    <div class="bubble bubble--bot bubble--list">
+                        <p>Common symptoms of diabetes include:</p>
+                        <ul>
+                            <li>Increased thirst</li>
+                            <li>Frequent urination</li>
+                            <li>Extreme fatigue</li>
+                            <li>Blurred vision</li>
+                            <li>Slow healing of cuts or wounds</li>
+                            <li>Unexplained weight loss</li>
+                        </ul>
+                        <p>If you experience these symptoms, it’s important to consult a healthcare professional for proper evaluation and diagnosis.</p>
+                        <time>10:30 AM</time>
+                    </div>
+                </article>
+            </section>
+
+            <footer class="chat-footer">
+                <form class="composer" id="chat-form">
+                    <button class="icon-button" type="button" aria-label="Attach file">📎</button>
+                    <input id="message-input" name="msg" type="text" placeholder="Type your medical question..." aria-label="Type your medical question" autocomplete="off" required>
+                    <button class="send-button" id="send-button" type="submit" aria-label="Send message">➤</button>
+                </form>
+
+                <p class="disclaimer">This AI assistant does not replace professional medical advice.</p>
+            </footer>
+        </section>
+    </main>
+
+    <script>
+        const chatForm = document.getElementById("chat-form");
+        const chatBody = document.getElementById("chat-body");
+        const messageInput = document.getElementById("message-input");
+        const sendButton = document.getElementById("send-button");
+
+        function scrollChatToBottom() {
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        function createMessageRow(message, sender) {
+            const row = document.createElement("article");
+            row.className = `message-row message-row--${sender}`;
+
+            if (sender === "bot") {
+                const avatar = document.createElement("div");
+                avatar.className = "avatar avatar--bot";
+                avatar.setAttribute("aria-hidden", "true");
+                avatar.textContent = "🤖";
+                row.appendChild(avatar);
+            }
+
+            const bubble = document.createElement("div");
+            bubble.className = `bubble bubble--${sender}`;
+
+            const paragraph = document.createElement("p");
+            paragraph.textContent = message;
+            bubble.appendChild(paragraph);
+
+            const timestamp = document.createElement("time");
+            timestamp.textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+            bubble.appendChild(timestamp);
+
+            row.appendChild(bubble);
+            return row;
+        }
+
+        chatForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const message = messageInput.value.trim();
+            if (!message) {
+                return;
+            }
+
+            chatBody.appendChild(createMessageRow(message, "user"));
+            messageInput.value = "";
+            scrollChatToBottom();
+
+            sendButton.disabled = true;
+
+            try {
+                const response = await fetch("/get", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    },
+                    body: new URLSearchParams({ msg: message }),
+                });
+
+                const data = await response.json();
+                const botMessage = data.answer || data.error || "Sorry, I could not process the response.";
+                chatBody.appendChild(createMessageRow(botMessage, "bot"));
+                scrollChatToBottom();
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                chatBody.appendChild(createMessageRow("Sorry, an error occurred while connecting to the server.", "bot"));
+                scrollChatToBottom();
+            } finally {
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        });
+    </script>
+
+</body>
+</html>
