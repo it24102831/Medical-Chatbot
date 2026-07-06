@@ -63,7 +63,7 @@ Follow these steps to set up and run the project locally.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Charindu01/Medical-Chatbot.git
+git clone https://github.com/it24102831/Medical-Chatbot.git
 cd Medical-Chatbot
 ```
 
