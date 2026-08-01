@@ -3,14 +3,30 @@ services:
     name: medical-chatbot
     runtime: python
     plan: free
-    buildCommand: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 app:app
+    buildCommand: python -m pip install --upgrade pip && python -m pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - app:app
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: INDEX_NAME
-        value: medical-chatbot
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: PINECONE_INDEX_NAME
+        value: medical-chatbot-v2
+      - key: PINECONE_NAMESPACE
+        value: medical-book
+      - key: PINECONE_EMBED_MODEL
+        value: llama-text-embed-v2
+      - key: OPENROUTER_MODEL
+        value: openai/gpt-4o-mini
+      - key: MAX_CONTEXT_CHARS
+        value: "12000"
+      - key: MAX_INPUT_CHARS
+        value: "2000"
       - key: PINECONE_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY

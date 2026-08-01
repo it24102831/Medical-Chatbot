@@ -36,36 +36,12 @@
                         <time>10:30 AM</time>
                     </div>
                 </article>
-
-                <article class="message-row message-row--user">
-                    <div class="bubble bubble--user">
-                        <p>What are the symptoms of diabetes?</p>
-                        <time>10:30 AM ✓✓</time>
-                    </div>
-                </article>
-
-                <article class="message-row message-row--bot">
-                    <div class="avatar avatar--bot" aria-hidden="true">🤖</div>
-                    <div class="bubble bubble--bot bubble--list">
-                        <p>Common symptoms of diabetes include:</p>
-                        <ul>
-                            <li>Increased thirst</li>
-                            <li>Frequent urination</li>
-                            <li>Extreme fatigue</li>
-                            <li>Blurred vision</li>
-                            <li>Slow healing of cuts or wounds</li>
-                            <li>Unexplained weight loss</li>
-                        </ul>
-                        <p>If you experience these symptoms, it’s important to consult a healthcare professional for proper evaluation and diagnosis.</p>
-                        <time>10:30 AM</time>
-                    </div>
-                </article>
             </section>
 
             <footer class="chat-footer">
                 <form class="composer" id="chat-form">
-                    <button class="icon-button" type="button" aria-label="Attach file">📎</button>
-                    <input id="message-input" name="msg" type="text" placeholder="Type your medical question..." aria-label="Type your medical question" autocomplete="off" required>
+                    <button class="icon-button" type="button" aria-label="Attach file" disabled>📎</button>
+                    <input id="message-input" name="msg" type="text" placeholder="Type your medical question..." aria-label="Type your medical question" autocomplete="off" maxlength="2000" required>
                     <button class="send-button" id="send-button" type="submit" aria-label="Send message">➤</button>
                 </form>
 
@@ -79,6 +55,7 @@
         const chatBody = document.getElementById("chat-body");
         const messageInput = document.getElementById("message-input");
         const sendButton = document.getElementById("send-button");
+        let inFlight = false;
 
         function scrollChatToBottom() {
             chatBody.scrollTop = chatBody.scrollHeight;
@@ -111,39 +88,46 @@
             return row;
         }
 
+        function setSubmitting(state) {
+            inFlight = state;
+            sendButton.disabled = state;
+            messageInput.disabled = state;
+        }
+
         chatForm.addEventListener("submit", async (event) => {
             event.preventDefault();
+            if (inFlight) return;
 
             const message = messageInput.value.trim();
-            if (!message) {
-                return;
-            }
+            if (!message) return;
 
             chatBody.appendChild(createMessageRow(message, "user"));
             messageInput.value = "";
             scrollChatToBottom();
-
-            sendButton.disabled = true;
+            setSubmitting(true);
 
             try {
                 const response = await fetch("/get", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    },
-                    body: new URLSearchParams({ msg: message }),
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ msg: message.slice(0, 2000) }),
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (_) {
+                    data = { error: "Unexpected server response." };
+                }
+
                 const botMessage = data.answer || data.error || "Sorry, I could not process the response.";
                 chatBody.appendChild(createMessageRow(botMessage, "bot"));
                 scrollChatToBottom();
-            } catch (error) {
-                console.error("Fetch Error:", error);
+            } catch (_) {
                 chatBody.appendChild(createMessageRow("Sorry, an error occurred while connecting to the server.", "bot"));
                 scrollChatToBottom();
             } finally {
-                sendButton.disabled = false;
+                setSubmitting(false);
                 messageInput.focus();
             }
         });
