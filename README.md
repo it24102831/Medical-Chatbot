@@ -1,121 +1,108 @@
-# Medical Chatbot
+# Medical Chatbot (Render 512MB-safe)
 
-This project is a Retrieval-Augmented Generation (RAG) based medical chatbot. It leverages a private collection of medical documents to provide informed answers to user questions. The application is built with Python, Flask, and LangChain, using Pinecone for vector storage and OpenRouter to access state-of-the-art language models.
+This version removes local embedding-model inference from the web process. Pinecone integrated embeddings handle both ingestion and query embedding.
 
-## Features
-
-- **RAG Architecture**: Answers questions based on information retrieved from a private collection of medical PDF documents.
-- **Web Interface**: A simple and clean chat interface for users to interact with the chatbot.
-- **REST API**: A `/get` endpoint to programmatically interact with the chatbot.
-- **Efficient Initialization**: The RAG chain is initialized lazily on the first request to ensure fast server startup.
-- **Modular Design**: The code is organized into modules for data processing, prompts, and the main application logic.
-- **Hardware Acceleration**: Automatically uses CUDA or MPS (for Apple Silicon) for embedding calculations if available, falling back to CPU.
-- **Robust Error Handling**: Gracefully handles common issues like invalid API keys and LLM output parsing errors.
-- **Extensible**: Easily add more documents to the `data` directory to expand the chatbot's knowledge base.
-
-## How It Works
-
-The chatbot follows a two-stage process:
-
-1.  **Indexing (Data Ingestion)**:
-    -   PDF documents from the `data/` directory are loaded.
-    -   The documents are split into smaller text chunks.
-    -   A pre-trained model from Hugging Face (`sentence-transformers/all-MiniLM-L6-v2`) is used to create vector embeddings for each chunk.
-    -   These embeddings are stored and indexed in a Pinecone vector database. This is a one-time process performed by the `store_index.py` script.
-
-2.  **Retrieval and Generation (Inference)**:
-    -   When a user asks a question, the application creates an embedding for the question.
-    -   It queries the Pinecone index to find the most semantically similar text chunks (the context).
-    -   The user's question and the retrieved context are passed to a Large Language Model (LLM) like `openai/gpt-4o-mini` via OpenRouter.
-    -   The LLM generates a concise, context-aware answer, which is then sent back to the user.
-
-## Tech Stack
-
-- **Backend**: Python, Flask
-- **AI/ML Framework**: LangChain
-- **Vector Database**: Pinecone
-- **Embeddings Model**: Hugging Face Sentence Transformers
-- **LLM Provider**: OpenRouter (accessing models like `openai/gpt-4o-mini`)
-- **Environment Management**: `dotenv`, `virtualenv`
-
-## Project Structure
-
-```
-Medical-Chatbot/
-├── app.py                # Main Flask application with API endpoints
-├── store_index.py        # Script to process PDFs and store them in Pinecone
-├── src/
-│   ├── helper.py         # Helper functions for loading PDFs, splitting text, etc.
-│   └── prompt.py         # Contains the system prompt for the LLM
-├── templates/
-│   └── chat.html         # Frontend HTML for the chat interface
-├── venv/                   # Python virtual environment (after setup)
-├── data/                 # Directory for your source PDF documents
-├── .env                  # File for storing environment variables (API keys)
-├── requirements.txt      # Python dependencies
-└── README.md             # This file
-```
-
-## Setup and Installation
-
-Follow these steps to set up and run the project locally.
-
-### 1. Clone the Repository
-
+## 1) Create virtual environment
 ```bash
-git clone https://github.com/it24102831/Medical-Chatbot.git
-cd Medical-Chatbot
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 ```
 
-### 2. Create and Activate a Virtual Environment
-
-```bash
-# For macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
-
-# For Windows
-python -m venv venv
-.\venv\Scripts\activate
-```
-
-### 3. Install Dependencies
-
+## 2) Install web dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set Up Environment Variables
-
-Create a `.env` file in the root directory and add your API keys. You can get these keys from Pinecone and OpenRouter (or OpenAI).
-
-```env
-# .env
-PINECONE_API_KEY="YOUR_PINECONE_API_KEY"
-OPENROUTER_API_KEY="YOUR_OPENROUTER_API_KEY"
-INDEX_NAME="medical-chatbot"
+## 3) Install ingestion dependencies
+```bash
+pip install -r requirements-ingest.txt
 ```
 
-## Usage
+## 4) Create environment variables
+```bash
+cp .env.example .env
+# then edit .env with real keys
+```
 
-### 1. Add Your Data
+Required:
+- `PINECONE_API_KEY`
+- `PINECONE_INDEX_NAME` (default `medical-chatbot-v2`)
+- `PINECONE_NAMESPACE` (default `medical-book`)
+- `PINECONE_EMBED_MODEL` (default `llama-text-embed-v2`)
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL` (default `openai/gpt-4o-mini`)
+- `MAX_CONTEXT_CHARS` (default `12000`)
+- `MAX_INPUT_CHARS` (default `2000`)
+- `PYTHON_VERSION` (default `3.11.9`)
 
-Place your medical PDF files inside the `data/` directory.
+## 5) Pinecone migration (required)
+Because embeddings moved from local `all-MiniLM-L6-v2` to hosted embeddings, **do not reuse the old 384-dim index**.
+Use a new index name (example: `medical-chatbot-v2`).
 
-### 2. Create the Vector Index
-
-Run the `store_index.py` script to process your documents and populate the Pinecone index. This only needs to be done once, or whenever you add new documents.
-
+## 6) Create/populate the integrated-embedding index
+Place PDFs in `data/`, then run:
 ```bash
 python store_index.py
 ```
+Optional full namespace refresh:
+```bash
+CLEAR_NAMESPACE=true python store_index.py
+```
 
-### 3. Run the Flask Application
+## 7) Verify uploaded records
+- Check script summary output (`records uploaded`, `index`, `namespace`, `embedding model`).
+- In Pinecone console, confirm records in the configured namespace.
 
-Start the web server.
-
+## 8) Run Flask locally
 ```bash
 python app.py
 ```
 
-The application will be available at `http://127.0.0.1:8080`. Open this URL in your browser to start chatting.
+## 9) Run Gunicorn locally
+```bash
+PORT=8000 gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - app:app
+```
+
+## 10) Deploy to Render (Web Service)
+- Build command:
+```bash
+python -m pip install --upgrade pip && python -m pip install --no-cache-dir -r requirements.txt
+```
+- Start command:
+```bash
+gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - app:app
+```
+- Health check path: `/health`
+
+## 11) Configure Render env vars
+Set:
+- `PYTHON_VERSION=3.11.9`
+- `WEB_CONCURRENCY=1`
+- `PYTHONUNBUFFERED=1`
+- `MALLOC_ARENA_MAX=2`
+- `PINECONE_API_KEY`
+- `PINECONE_INDEX_NAME=medical-chatbot-v2`
+- `PINECONE_NAMESPACE=medical-book`
+- `PINECONE_EMBED_MODEL=llama-text-embed-v2`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL=openai/gpt-4o-mini`
+- `MAX_CONTEXT_CHARS=12000`
+- `MAX_INPUT_CHARS=2000`
+- `TOP_K=3`
+
+## 12) Test health and readiness
+```bash
+curl -s http://127.0.0.1:8000/health
+curl -s http://127.0.0.1:8000/ready
+curl -s -X POST http://127.0.0.1:8000/get -H 'Content-Type: application/json' -d '{"msg":"What is hypertension?"}'
+```
+
+## 13) Troubleshooting
+- **Memory-limit restarts**: verify one worker, runtime uses `requirements.txt` only, and no torch/sentence-transformers installed.
+- **502 errors**: check OpenRouter/Pinecone auth, provider status, and app logs.
+- **Empty index**: rerun `python store_index.py` and verify records uploaded.
+- **Wrong namespace**: ensure `PINECONE_NAMESPACE` matches ingestion namespace.
+- **Invalid API keys**: update `PINECONE_API_KEY`/`OPENROUTER_API_KEY`.
+- **Pinecone rate limits**: reduce request rate, keep `TOP_K` low.
+- **OpenRouter failures**: verify model name, retries/timeouts, and provider availability.
