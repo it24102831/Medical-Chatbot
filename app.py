@@ -204,7 +204,7 @@ def _openrouter_chat_completion(messages: List[Dict[str, str]]) -> Response:
         "temperature": 0.1,
     }
     headers = {
-        "Authorization": f"******",
+        "Authorization": "Bearer " + api_key,
         "Content-Type": "application/json",
     }
 
@@ -345,24 +345,25 @@ def chat():
         message = _extract_message()
     except TypeError:
         return jsonify({"error": "Unsupported content type."}), 415
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except OverflowError as exc:
-        return jsonify({"error": str(exc)}), 413
+    except ValueError:
+        return jsonify({"error": "Invalid question input."}), 400
+    except OverflowError:
+        max_input_chars = max(1, int(_env("MAX_INPUT_CHARS", "2000") or "2000"))
+        return jsonify({"error": f"Question exceeds {max_input_chars} characters."}), 413
 
     try:
         context = retrieve_context(message)
         answer = generate_answer(message, context)
         return jsonify({"answer": answer}), 200
-    except PermissionError as exc:
+    except PermissionError:
         logger.exception("Authentication error in request flow")
-        return jsonify({"error": str(exc)}), 502
-    except TimeoutError as exc:
+        return jsonify({"error": "Authentication with an upstream service failed."}), 502
+    except TimeoutError:
         logger.exception("Timeout error in request flow")
-        return jsonify({"error": str(exc)}), 504
-    except (ConnectionError, RuntimeError, ValueError) as exc:
+        return jsonify({"error": "An upstream service timed out."}), 504
+    except (ConnectionError, RuntimeError, ValueError):
         logger.exception("Upstream service error in request flow")
-        return jsonify({"error": str(exc)}), 502
+        return jsonify({"error": "An upstream service is currently unavailable."}), 502
     except Exception:
         logger.exception("Unexpected request failure")
         return jsonify({"error": "Unexpected server error."}), 500
