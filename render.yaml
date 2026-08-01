@@ -1,38 +1,17 @@
-# render.yaml
-# This file specifies the infrastructure for deploying the Medical Chatbot on Render.
-# It defines a web service, sets the Python version, and configures environment variables.
-
 services:
   - type: web
     name: medical-chatbot
-    env: python
-    # Pin the Python version to a compatible one, e.g., 3.12.4
-    pythonVersion: "3.12.4"
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --bind 0.0.0.0:$PORT app:app"
+    runtime: python
+    plan: free
+    buildCommand: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 app:app
     healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 8080
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: INDEX_NAME
-        value: "medical-chatbot" # Or your specific Pinecone index name
-      # Secrets are managed in the Render dashboard and linked here.
-      # Do not hardcode secret values in this file.
+        value: medical-chatbot
       - key: PINECONE_API_KEY
-        fromSecret:
-          name: pinecone-api-key # The name of the secret in Render
-          key: PINECONE_API_KEY
+        sync: false
       - key: OPENROUTER_API_KEY
-        fromSecret:
-          name: openrouter-api-key # The name of the secret in Render
-          key: OPENROUTER_API_KEY
-    # Instance type configuration (optional, but recommended for performance)
-    plan: standard # Or another plan based on your needs
-    # The following settings are based on your DEPLOY_CLOUD_RUN.md file
-    # and can be adjusted in the Render dashboard under your service settings.
-    # region: oregon # e.g., oregon (us-west) or frankfurt (eu-central)
-    # instanceCount: 1
-    # scaling:
-    #   minInstances: 1
-    #   maxInstances: 3
-    #   targetConcurrency: 80 # Concurrency per instance
+        sync: false
